@@ -96,31 +96,41 @@ else:
 
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
-        st.dataframe(df.head())
+        st.success("✅ Fichier chargé. Prêt à l'envoi.")
+        st.dataframe(df.head())  # Aperçu du fichier
 
-        # Vérifier colonnes obligatoires
-        required_columns = [
-            "GrLivArea", "OverallQual", "YearBuilt", "TotalBsmtSF", "GarageArea",
-            "Neighborhood", "MSZoning"
-        ]
+        if st.button("🔄 Envoyer au serveur pour prédiction"):
+            try:
+                # Envoi du fichier brut (multipart/form-data)
+                files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "text/csv")}
+                response = requests.post(
+                    "https://house-price-prediction-f3xa.onrender.com/api/predict/batch",
+                    files=files
+                )
 
-        missing = [col for col in required_columns if col not in df.columns]
-        if missing:
-            st.error(f"❌ Colonnes manquantes dans le fichier CSV : {', '.join(missing)}")
-        else:
-            if st.button("🔄 Envoyer au serveur pour prédiction"):
-                try:
-                    payload = {"instances": df.to_dict(orient="records")}
-                    response = requests.post("https://house-price-prediction-f3xa.onrender.com/api/predict/batch", json=payload)
+                if response.status_code == 200:
+                    predictions = response.json().get("predictions", [])
 
-                    if response.status_code == 200:
-                        preds = response.json().get("predictions", [])
-                        df["PredictedPrice"] = preds
-                        st.success("✅ Prédictions obtenues")
-                        st.dataframe(df)
-                        csv = df.to_csv(index=False).encode("utf-8")
-                        st.download_button("💾 Télécharger les résultats", data=csv, file_name="predictions.csv", mime="text/csv")
+                    if len(predictions) != len(df):
+                        st.warning("⚠️ Le nombre de prédictions ne correspond pas au nombre de lignes.")
                     else:
-                        st.error(f"Erreur {response.status_code} : {response.text}")
-                except requests.exceptions.ConnectionError:
-                    st.error("❌ Impossible de se connecter à l'API (localhost:8000)")
+                        df["PredictedPrice"] = predictions
+
+                        # ✅ Afficher les résultats dans l'interface
+                        st.success("✅ Prédictions obtenues et affichées ci-dessous")
+                        st.dataframe(df)
+
+                        # 💾 Télécharger les résultats enrichis
+                        result_csv = df.to_csv(index=False).encode("utf-8")
+                        st.download_button(
+                            label="💾 Télécharger les résultats",
+                            data=result_csv,
+                            file_name="predictions.csv",
+                            mime="text/csv"
+                        )
+                else:
+                    st.error(f"❌ Erreur {response.status_code} : {response.text}")
+            except requests.exceptions.RequestException as e:
+                st.error(f"❌ Erreur de connexion : {e}")
+
+
