@@ -1,0 +1,15 @@
+pred_df = pd.DataFrame.from_dict(pred_dict, orient="index", columns=["PredictedPrice"])
+pred_df.index.name = "Index"
+pred_df.reset_index(inplace=True)
+
+# ✅ Affichage stylisé dans Streamlit
+st.markdown("### 📋 Résultats des prédictions")
+st.dataframe(
+    pred_df.style.format({
+        "PredictedPrice": "${:,.0f}"
+    }).background_gradient(
+        subset=["PredictedPrice"],
+        cmap="Greens"
+    ),
+    use_container_width=True
+)
